@@ -26,16 +26,21 @@ export interface DbAdapter {
   deleteVersion: (id: string) => Promise<void>;
 }
 
-let externalAdapter: DbAdapter | null = null;
+// Store adapter on window so it survives Vite HMR module reloads
+const _win = window as unknown as { __scenia_db_adapter?: DbAdapter | null };
 
 /** Set an external adapter to bypass IndexedDB (used when embedded in a host app). */
 export function setDbAdapter(adapter: DbAdapter): void {
-  externalAdapter = adapter;
+  _win.__scenia_db_adapter = adapter;
 }
 
 /** Check if an external adapter is configured. */
 export function hasExternalAdapter(): boolean {
-  return externalAdapter !== null;
+  return _win.__scenia_db_adapter != null;
+}
+
+function getAdapter(): DbAdapter | null {
+  return _win.__scenia_db_adapter ?? null;
 }
 
 interface ITMapDB extends DBSchema {
@@ -142,7 +147,11 @@ export const initDB = () => {
 };
 
 export const getAppData = async (): Promise<AppData> => {
-  if (externalAdapter) return externalAdapter.getAppData();
+  if (getAdapter()) {
+    console.log('[Scenia db] Loading via Iris adapter');
+    return getAdapter()!.getAppData();
+  }
+  console.log('[Scenia db] Loading from IndexedDB (no adapter)');
   const db = await initDB();
   const assets = await db.getAll('assets');
   const applications = db.objectStoreNames.contains('applications') ? await db.getAll('applications') : [];
@@ -180,7 +189,11 @@ export const getAppData = async (): Promise<AppData> => {
 };
 
 export const saveAppData = async (data: AppData): Promise<void> => {
-  if (externalAdapter) return externalAdapter.saveAppData(data);
+  if (getAdapter()) {
+    console.log('[Scenia db] Saving via Iris adapter');
+    return getAdapter()!.saveAppData(data);
+  }
+  console.log('[Scenia db] Saving to IndexedDB (no adapter)');
   const db = await initDB();
   const stores: ("assets" | "applications" | "applicationSegments" | "applicationStatuses" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources")[] = [
     'assets', 'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies', 'assetCategories'
@@ -248,19 +261,19 @@ export const saveAppData = async (data: AppData): Promise<void> => {
 
 // Versions helper functions
 export const saveVersion = async (version: Version): Promise<void> => {
-  if (externalAdapter) return externalAdapter.saveVersion(version);
+  if (getAdapter()) return getAdapter()!.saveVersion(version);
   const db = await initDB();
   await db.put('versions', version);
 };
 
 export const getAllVersions = async (): Promise<Version[]> => {
-  if (externalAdapter) return externalAdapter.getAllVersions();
+  if (getAdapter()) return getAdapter()!.getAllVersions();
   const db = await initDB();
   return db.getAll('versions');
 };
 
 export const deleteVersion = async (id: string): Promise<void> => {
-  if (externalAdapter) return externalAdapter.deleteVersion(id);
+  if (getAdapter()) return getAdapter()!.deleteVersion(id);
   const db = await initDB();
   await db.delete('versions', id);
 };

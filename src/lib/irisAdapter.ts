@@ -52,6 +52,11 @@ interface IrisBulkData {
 
 // --- Transforms ---
 
+/** Generate a simple unique ID to replace temporary 'new-*' IDs. */
+function stableId(): string {
+  return crypto.randomUUID();
+}
+
 function entityToNative(entity: IrisEntity): Record<string, unknown> {
   return {
     id: entity.id,
@@ -64,9 +69,11 @@ function entityToNative(entity: IrisEntity): Record<string, unknown> {
 function nativeToEntity(
   native: Record<string, unknown>,
   setId: string,
-): { name: string; description: string | null; data: Record<string, unknown>; set_id: string } {
-  const { id: _id, name, description, ...rest } = native;
+): { id?: string; name: string; description: string | null; data: Record<string, unknown>; set_id: string } {
+  const { id, name, description, ...rest } = native;
+  const resolvedId = id && typeof id === 'string' && !id.startsWith('new-') ? id : stableId();
   return {
+    id: resolvedId,
     name: (name as string) ?? 'Untitled',
     description: (description as string) ?? null,
     data: rest,
@@ -130,20 +137,20 @@ function sceniaToApi(data: AppData, setId: string): Record<string, unknown> {
 
   if (data.dependencies) {
     result.dependencies = data.dependencies.map((dep) => {
-      const { id: _id, sourceId, targetId, type, ...rest } = dep;
-      return { source_id: sourceId, target_id: targetId, dependency_type: type, set_id: setId, data: rest };
+      const { id, sourceId, targetId, type, ...rest } = dep;
+      return { ...(id ? { id } : {}), source_id: sourceId, target_id: targetId, dependency_type: type, set_id: setId, data: rest };
     });
   }
 
   if (data.assetCategories) {
     result.asset_categories = data.assetCategories.map((cat) => ({
-      name: cat.name, display_order: cat.order ?? 0, set_id: setId,
+      id: cat.id, name: cat.name, display_order: cat.order ?? 0, set_id: setId,
     }));
   }
 
   if (data.applicationStatuses) {
     result.app_statuses = data.applicationStatuses.map((s) => ({
-      name: s.name, color: s.color, display_order: 0, set_id: setId,
+      id: s.id, name: s.name, color: s.color, display_order: 0, set_id: setId,
     }));
   }
 
@@ -162,28 +169,48 @@ function sceniaToApi(data: AppData, setId: string): Record<string, unknown> {
 
 // --- Adapter ---
 
+function handleAuthError(): never {
+  alert('Your Iris session has expired. Please close this tab and reopen Scenia from Iris.');
+  throw new Error('Iris session expired');
+}
+
 export function createIrisAdapter(apiUrl: string, token: string, setId: string): DbAdapter {
   const headers = {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
   };
 
+  async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
+    try {
+      const res = await fetch(url, { ...init, headers });
+      if (res.status === 401) handleAuthError();
+      if (!res.ok) throw new Error(`Iris API error: ${res.status}`);
+      return res;
+    } catch (e) {
+      console.error('[Scenia] API fetch failed:', url, e);
+      throw e;
+    }
+  }
+
   return {
     async getAppData(): Promise<AppData> {
-      const res = await fetch(`${apiUrl}/api/scenia/data?set_id=${encodeURIComponent(setId)}`, { headers });
-      if (!res.ok) throw new Error(`Iris API error: ${res.status}`);
+      const res = await apiFetch(`${apiUrl}/api/scenia/data?set_id=${encodeURIComponent(setId)}`);
       const apiData: IrisBulkData = await res.json();
       return apiToScenia(apiData);
     },
 
     async saveAppData(data: AppData): Promise<void> {
       const payload = sceniaToApi(data, setId);
-      const res = await fetch(`${apiUrl}/api/scenia/data?set_id=${encodeURIComponent(setId)}`, {
+      // Log entity counts being saved
+      const counts: Record<string, number> = {};
+      for (const [k, v] of Object.entries(payload)) {
+        if (Array.isArray(v)) counts[k] = v.length;
+      }
+      console.log('[Scenia] Saving to Iris:', counts);
+      await apiFetch(`${apiUrl}/api/scenia/data?set_id=${encodeURIComponent(setId)}`, {
         method: 'PUT',
-        headers,
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error(`Iris API save error: ${res.status}`);
     },
 
     async getAllVersions(): Promise<Version[]> {

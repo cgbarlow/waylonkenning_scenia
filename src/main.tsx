@@ -13,7 +13,18 @@ const token = params.get('token');
 const setId = params.get('setId');
 
 if (apiUrl && token && setId) {
+  console.log('[Scenia] Iris mode: API at', apiUrl, 'set', setId, 'token length', token.length);
+  // Quick connectivity test
+  fetch(`${apiUrl}/api/extensions/scenia`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }).then(r => {
+    console.log('[Scenia] API connectivity:', r.status, r.ok ? 'OK' : 'FAILED');
+  }).catch(e => {
+    console.error('[Scenia] API connectivity BLOCKED:', e.message);
+  });
   setDbAdapter(createIrisAdapter(apiUrl, token, setId));
+} else {
+  console.log('[Scenia] Standalone mode (IndexedDB)');
 }
 
 createRoot(document.getElementById('root')!).render(

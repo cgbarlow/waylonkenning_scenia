@@ -112,7 +112,7 @@ export default function App() {
 
         // If DB is empty (first run), show the template picker (or auto-load GEANZ in E2E mode)
         if (dbData.assets.length === 0 && dbData.initiatives.length === 0) {
-          if (localStorage.getItem('scenia-e2e')) {
+          if (localStorage.getItem('scenia-e2e') || new URLSearchParams(window.location.search).has('setId')) {
             // E2E mode: auto-load GEANZ template so existing tests keep working
             const defaults = {
               assets: initialAssets,

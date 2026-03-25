@@ -1,6 +1,43 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
 
+// --- Pluggable adapter for external embedding (e.g., Iris) ---
+
+export type AppData = {
+  assets: Asset[];
+  applications: Application[];
+  applicationSegments: ApplicationSegment[];
+  initiatives: Initiative[];
+  milestones: Milestone[];
+  programmes: Programme[];
+  strategies: Strategy[];
+  dependencies: Dependency[];
+  assetCategories: AssetCategory[];
+  timelineSettings: TimelineSettings;
+  resources: Resource[];
+  applicationStatuses: ApplicationStatus[];
+};
+
+export interface DbAdapter {
+  getAppData: () => Promise<AppData>;
+  saveAppData: (data: AppData) => Promise<void>;
+  getAllVersions: () => Promise<Version[]>;
+  saveVersion: (version: Version) => Promise<void>;
+  deleteVersion: (id: string) => Promise<void>;
+}
+
+let externalAdapter: DbAdapter | null = null;
+
+/** Set an external adapter to bypass IndexedDB (used when embedded in a host app). */
+export function setDbAdapter(adapter: DbAdapter): void {
+  externalAdapter = adapter;
+}
+
+/** Check if an external adapter is configured. */
+export function hasExternalAdapter(): boolean {
+  return externalAdapter !== null;
+}
+
 interface ITMapDB extends DBSchema {
   assets: {
     key: string;
@@ -104,7 +141,8 @@ export const initDB = () => {
   return dbPromise;
 };
 
-export const getAppData = async () => {
+export const getAppData = async (): Promise<AppData> => {
+  if (externalAdapter) return externalAdapter.getAppData();
   const db = await initDB();
   const assets = await db.getAll('assets');
   const applications = db.objectStoreNames.contains('applications') ? await db.getAll('applications') : [];
@@ -141,20 +179,8 @@ export const getAppData = async () => {
   };
 };
 
-export const saveAppData = async (data: {
-  assets: Asset[];
-  applications: Application[];
-  applicationSegments: ApplicationSegment[];
-  initiatives: Initiative[];
-  milestones: Milestone[];
-  programmes: Programme[];
-  strategies: Strategy[];
-  dependencies: Dependency[];
-  assetCategories: AssetCategory[];
-  timelineSettings: TimelineSettings;
-  resources: Resource[];
-  applicationStatuses: ApplicationStatus[];
-}) => {
+export const saveAppData = async (data: AppData): Promise<void> => {
+  if (externalAdapter) return externalAdapter.saveAppData(data);
   const db = await initDB();
   const stores: ("assets" | "applications" | "applicationSegments" | "applicationStatuses" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources")[] = [
     'assets', 'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies', 'assetCategories'
@@ -221,17 +247,20 @@ export const saveAppData = async (data: {
 };
 
 // Versions helper functions
-export const saveVersion = async (version: Version) => {
+export const saveVersion = async (version: Version): Promise<void> => {
+  if (externalAdapter) return externalAdapter.saveVersion(version);
   const db = await initDB();
   await db.put('versions', version);
 };
 
-export const getAllVersions = async () => {
+export const getAllVersions = async (): Promise<Version[]> => {
+  if (externalAdapter) return externalAdapter.getAllVersions();
   const db = await initDB();
   return db.getAll('versions');
 };
 
-export const deleteVersion = async (id: string) => {
+export const deleteVersion = async (id: string): Promise<void> => {
+  if (externalAdapter) return externalAdapter.deleteVersion(id);
   const db = await initDB();
   await db.delete('versions', id);
 };

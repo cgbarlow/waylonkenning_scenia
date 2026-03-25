@@ -20,6 +20,17 @@ export default defineConfig({
       '@': path.resolve(__dirname, '.'),
     },
   },
+  build: {
+    lib: {
+      entry: path.resolve(__dirname, 'src/embed.tsx'),
+      formats: ['es'],
+      fileName: 'embed',
+    },
+    rollupOptions: {
+      external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
+    },
+    cssCodeSplit: false,
+  },
   server: {
     headers: securityHeaders,
   },

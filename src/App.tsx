@@ -50,7 +50,7 @@ type AppState = {
   applicationStatuses: ApplicationStatus[];
 };
 import { cn } from './lib/utils';
-import { getAppData, saveAppData } from './lib/db';
+import { getAppData, saveAppData, hasExternalAdapter } from './lib/db';
 import { useRef } from 'react';
 
 export default function App() {
@@ -61,7 +61,7 @@ export default function App() {
   const [showFeatures, setShowFeatures] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showLandingPage, setShowLandingPage] = useState(
-    !localStorage.getItem('scenia_has_seen_landing') && !localStorage.getItem('scenia-e2e')
+    !hasExternalAdapter() && !localStorage.getItem('scenia_has_seen_landing') && !localStorage.getItem('scenia-e2e')
   );
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 

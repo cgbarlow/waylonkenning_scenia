@@ -61,7 +61,7 @@ export default function App() {
   const [showFeatures, setShowFeatures] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showLandingPage, setShowLandingPage] = useState(
-    !hasExternalAdapter() && !localStorage.getItem('scenia_has_seen_landing') && !localStorage.getItem('scenia-e2e')
+    !hasExternalAdapter() && !localStorage.getItem('scenia_has_seen_landing') && !localStorage.getItem('scenia-e2e') && !new URLSearchParams(window.location.search).has('setId')
   );
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 

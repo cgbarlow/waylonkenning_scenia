@@ -26,6 +26,7 @@
     "src/types.ts"
   ],
   "scripts": {
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build",
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",

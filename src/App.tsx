@@ -50,7 +50,7 @@ type AppState = {
   applicationStatuses: ApplicationStatus[];
 };
 import { cn } from './lib/utils';
-import { getAppData, saveAppData } from './lib/db';
+import { getAppData, saveAppData, hasExternalAdapter } from './lib/db';
 import { useRef } from 'react';
 
 export default function App() {
@@ -61,7 +61,7 @@ export default function App() {
   const [showFeatures, setShowFeatures] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showLandingPage, setShowLandingPage] = useState(
-    !localStorage.getItem('scenia_has_seen_landing') && !localStorage.getItem('scenia-e2e')
+    !hasExternalAdapter() && !localStorage.getItem('scenia_has_seen_landing') && !localStorage.getItem('scenia-e2e') && !new URLSearchParams(window.location.search).has('setId')
   );
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
@@ -112,7 +112,7 @@ export default function App() {
 
         // If DB is empty (first run), show the template picker (or auto-load GEANZ in E2E mode)
         if (dbData.assets.length === 0 && dbData.initiatives.length === 0) {
-          if (localStorage.getItem('scenia-e2e')) {
+          if (localStorage.getItem('scenia-e2e') || new URLSearchParams(window.location.search).has('setId')) {
             // E2E mode: auto-load GEANZ template so existing tests keep working
             const defaults = {
               assets: initialAssets,

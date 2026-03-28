@@ -1,6 +1,48 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Asset, Application, ApplicationSegment, ApplicationStatus, Initiative, Milestone, Programme, Strategy, Dependency, AssetCategory, TimelineSettings, Version, Resource } from '../types';
 
+// --- Pluggable adapter for external embedding (e.g., Iris) ---
+
+export type AppData = {
+  assets: Asset[];
+  applications: Application[];
+  applicationSegments: ApplicationSegment[];
+  initiatives: Initiative[];
+  milestones: Milestone[];
+  programmes: Programme[];
+  strategies: Strategy[];
+  dependencies: Dependency[];
+  assetCategories: AssetCategory[];
+  timelineSettings: TimelineSettings;
+  resources: Resource[];
+  applicationStatuses: ApplicationStatus[];
+};
+
+export interface DbAdapter {
+  getAppData: () => Promise<AppData>;
+  saveAppData: (data: AppData) => Promise<void>;
+  getAllVersions: () => Promise<Version[]>;
+  saveVersion: (version: Version) => Promise<void>;
+  deleteVersion: (id: string) => Promise<void>;
+}
+
+// Store adapter on window so it survives Vite HMR module reloads
+const _win = window as unknown as { __scenia_db_adapter?: DbAdapter | null };
+
+/** Set an external adapter to bypass IndexedDB (used when embedded in a host app). */
+export function setDbAdapter(adapter: DbAdapter): void {
+  _win.__scenia_db_adapter = adapter;
+}
+
+/** Check if an external adapter is configured. */
+export function hasExternalAdapter(): boolean {
+  return _win.__scenia_db_adapter != null;
+}
+
+function getAdapter(): DbAdapter | null {
+  return _win.__scenia_db_adapter ?? null;
+}
+
 interface ITMapDB extends DBSchema {
   assets: {
     key: string;
@@ -104,7 +146,12 @@ export const initDB = () => {
   return dbPromise;
 };
 
-export const getAppData = async () => {
+export const getAppData = async (): Promise<AppData> => {
+  if (getAdapter()) {
+    console.log('[Scenia db] Loading via Iris adapter');
+    return getAdapter()!.getAppData();
+  }
+  console.log('[Scenia db] Loading from IndexedDB (no adapter)');
   const db = await initDB();
   const assets = await db.getAll('assets');
   const applications = db.objectStoreNames.contains('applications') ? await db.getAll('applications') : [];
@@ -141,20 +188,12 @@ export const getAppData = async () => {
   };
 };
 
-export const saveAppData = async (data: {
-  assets: Asset[];
-  applications: Application[];
-  applicationSegments: ApplicationSegment[];
-  initiatives: Initiative[];
-  milestones: Milestone[];
-  programmes: Programme[];
-  strategies: Strategy[];
-  dependencies: Dependency[];
-  assetCategories: AssetCategory[];
-  timelineSettings: TimelineSettings;
-  resources: Resource[];
-  applicationStatuses: ApplicationStatus[];
-}) => {
+export const saveAppData = async (data: AppData): Promise<void> => {
+  if (getAdapter()) {
+    console.log('[Scenia db] Saving via Iris adapter');
+    return getAdapter()!.saveAppData(data);
+  }
+  console.log('[Scenia db] Saving to IndexedDB (no adapter)');
   const db = await initDB();
   const stores: ("assets" | "applications" | "applicationSegments" | "applicationStatuses" | "initiatives" | "milestones" | "programmes" | "strategies" | "dependencies" | "assetCategories" | "settings" | "resources")[] = [
     'assets', 'initiatives', 'milestones', 'programmes', 'strategies', 'dependencies', 'assetCategories'
@@ -221,17 +260,20 @@ export const saveAppData = async (data: {
 };
 
 // Versions helper functions
-export const saveVersion = async (version: Version) => {
+export const saveVersion = async (version: Version): Promise<void> => {
+  if (getAdapter()) return getAdapter()!.saveVersion(version);
   const db = await initDB();
   await db.put('versions', version);
 };
 
-export const getAllVersions = async () => {
+export const getAllVersions = async (): Promise<Version[]> => {
+  if (getAdapter()) return getAdapter()!.getAllVersions();
   const db = await initDB();
   return db.getAll('versions');
 };
 
-export const deleteVersion = async (id: string) => {
+export const deleteVersion = async (id: string): Promise<void> => {
+  if (getAdapter()) return getAdapter()!.deleteVersion(id);
   const db = await initDB();
   await db.delete('versions', id);
 };

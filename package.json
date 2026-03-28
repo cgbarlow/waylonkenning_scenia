@@ -14,7 +14,20 @@
   },
   "homepage": "https://github.com/waylonkenning/scenia#readme",
   "type": "module",
+  "main": "dist/embed.js",
+  "exports": {
+    ".": {
+      "import": "./dist/embed.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist",
+    "src/types.ts"
+  ],
   "scripts": {
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build",
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
@@ -31,12 +44,14 @@
     "jspdf": "^4.2.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

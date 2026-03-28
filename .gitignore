@@ -1,6 +1,6 @@
 node_modules/
 build/
-dist/
+# dist/ — committed for GitHub install consumers
 coverage/
 test-results/
 .DS_Store
